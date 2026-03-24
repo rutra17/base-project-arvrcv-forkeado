@@ -1,0 +1,10 @@
+flask==3.0.3
+flask-socketio==5.3.6
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==12.1.1
+python-engineio==4.9.1
+python-socketio==5.11.3
+eventlet==0.36.1
+openai==1.82.0
+mediapipe==0.10.33

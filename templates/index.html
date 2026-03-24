@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR/VR + Visão Computacional – Servidor Base</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .tech-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .6rem;
+      margin: 1.5rem 0;
+    }
+    .tech-badge {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: .35rem .9rem;
+      font-size: .82rem;
+      color: var(--text-muted);
+    }
+    .ws-indicator {
+      margin: 1rem auto 0;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .9rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">🚀 AR/VR·CV Server</div>
+  <div class="navbar-links">
+    <a href="/" class="active">Início</a>
+    <a href="/arvr">AR/VR</a>
+    <a href="/cv">Visão Computacional</a>
+    <a href="/cv3d">CV → 3D</a>
+    <a href="/worldgen">AI World Gen</a>
+  </div>
+  <div id="wsStatus" class="status-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Desconectado</span>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>🌐 Servidor Base</h1>
+  <p>
+    Plataforma de referência para projetos das disciplinas de
+    <strong>Realidade Aumentada e Virtual</strong> e
+    <strong>Visão Computacional</strong>.
+    Utilize WebSocket em tempo real para interagir com cenas 3D e pipelines de CV.
+  </p>
+
+  <div class="tech-badges">
+    <span class="tech-badge">🐍 Python / Flask</span>
+    <span class="tech-badge">🔌 Socket.IO</span>
+    <span class="tech-badge">🥽 A-Frame (WebXR)</span>
+    <span class="tech-badge">👁️ OpenCV</span>
+    <span class="tech-badge">🎮 WebGL / Three.js</span>
+  </div>
+
+  <div class="ws-indicator">
+    <span class="status-dot" id="homeDot"></span>
+    <span id="homeStatusText">Verificando servidor…</span>
+  </div>
+</section>
+
+<!-- Cards das interfaces -->
+<div class="cards-grid">
+
+  <!-- Card AR/VR -->
+  <div class="feature-card">
+    <div class="icon">🥽</div>
+    <h2>Realidade Aumentada e Virtual</h2>
+    <p>
+      Cena 3D interativa construída com A-Frame (WebXR). Use o painel de controle
+      para adicionar objetos, mudar cores, animar elementos e experimentar
+      comandos via WebSocket em tempo real.
+    </p>
+    <a href="/arvr" class="btn btn-primary btn-block">Abrir Interface AR/VR</a>
+  </div>
+
+  <!-- Card CV -->
+  <div class="feature-card">
+    <div class="icon">👁️</div>
+    <h2>Visão Computacional</h2>
+    <p>
+      Capture frames da sua webcam e envie ao servidor Python (OpenCV).
+      Escolha um pipeline: detecção de bordas, contornos, rostos, segmentação
+      por cor e mais. Veja os resultados em tempo real.
+    </p>
+    <a href="/cv" class="btn btn-secondary btn-block">Abrir Interface CV</a>
+  </div>
+
+  <!-- Card CV → 3D -->
+  <div class="feature-card">
+    <div class="icon">🔬</div>
+    <h2>CV → 3D Bridge</h2>
+    <p>
+      Visão Computacional encontra Three.js: contornos viram formas extrudadas,
+      rostos viram esferas, bordas viram wireframes e cores viram nuvens de pontos
+      – tudo em tempo real na cena 3D.
+    </p>
+    <a href="/cv3d" class="btn btn-primary btn-block" style="background:linear-gradient(135deg,var(--primary),var(--secondary))">Abrir CV → 3D</a>
+  </div>
+
+  <div class="feature-card">
+    <div class="icon">🤖</div>
+    <h2>AI World Gen</h2>
+    <p>
+      Gere mundos 3D completos com IA! Digite um prompt em linguagem natural
+      e a OpenAI cria cenas A-Frame interativas com iluminação, animações e
+      ambientes imersivos.
+    </p>
+    <a href="/worldgen" class="btn btn-primary btn-block" style="background:linear-gradient(135deg,#f97316,#ec4899)">Abrir AI World Gen</a>
+  </div>
+
+  <!-- Card Docs / Base -->
+  <div class="feature-card">
+    <div class="icon">📡</div>
+    <h2>API WebSocket</h2>
+    <p>
+      Conecte qualquer cliente ao servidor usando Socket.IO.
+      Sala <code>arvr</code> para comandos de cena 3D e sala <code>cv</code>
+      para processamento de imagens.
+    </p>
+    <a href="https://socket.io/docs/v4/client-api/" target="_blank" rel="noopener"
+       class="btn btn-outline btn-block">Documentação Socket.IO ↗</a>
+  </div>
+
+</div>
+
+<!-- Resumo dos eventos -->
+<div style="max-width:900px;margin:0 auto 3rem;padding:0 1.5rem">
+  <div class="card">
+    <div class="card-title">📋 Eventos WebSocket disponíveis</div>
+    <div class="grid-2 gap-2">
+      <div>
+        <p style="color:var(--accent);font-weight:600;margin-bottom:.5rem">🥽 Sala: arvr</p>
+        <ul style="padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:2">
+          <li><code>join_arvr</code> – entra na sala e recebe estado atual</li>
+          <li><code>arvr_command</code> – envia comando à cena</li>
+          <li><code>scene_state</code> – estado completo (servidor → cliente)</li>
+          <li><code>object_added / removed / moved</code> – eventos de objeto</li>
+          <li><code>sky_changed / scene_cleared</code> – eventos de cena</li>
+        </ul>
+      </div>
+      <div>
+        <p style="color:var(--secondary);font-weight:600;margin-bottom:.5rem">👁️ Sala: cv</p>
+        <ul style="padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:2">
+          <li><code>join_cv</code> – entra na sala CV</li>
+          <li><code>cv_frame</code> – envia imagem base64 + pipeline</li>
+          <li><code>cv_result</code> – resultado com imagem + detecções</li>
+          <li>Pipelines: <code>edges</code>, <code>contours</code>, <code>faces</code></li>
+          <li>Pipelines: <code>color</code>, <code>blur</code>, <code>threshold</code></li>
+        </ul>
+      </div>
+      <div>
+        <p style="color:#ff9800;font-weight:600;margin-bottom:.5rem">🔬 Sala: cv3d</p>
+        <ul style="padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:2">
+          <li><code>join_cv3d</code> – entra na sala CV→3D</li>
+          <li><code>cv3d_frame</code> – envia frame + pipeline</li>
+          <li><code>cv3d_result</code> – imagem + detecções + geometria 3D</li>
+          <li><code>cv3d_broadcast</code> – retransmite cena 3D</li>
+          <li><code>cv3d_scene_update</code> – recebe cena de broadcast</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/vendor/socket.io.min.js"></script>
+<script>
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const homeDot = document.getElementById('homeDot');
+  const homeStatusText = document.getElementById('homeStatusText');
+
+  const socket = io({ transports: ['websocket'] });
+
+  socket.on('connect', () => {
+    dot.classList.add('connected');
+    homeDot.classList.add('connected');
+    txt.textContent = 'Conectado';
+    homeStatusText.textContent = 'Servidor online e pronto ✓';
+  });
+
+  socket.on('disconnect', () => {
+    dot.classList.remove('connected');
+    homeDot.classList.remove('connected');
+    txt.textContent = 'Desconectado';
+    homeStatusText.textContent = 'Servidor desconectado';
+  });
+</script>
+</body>
+</html>

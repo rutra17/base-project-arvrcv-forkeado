@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visão Computacional – CV Interface</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/vendor/socket.io.min.js"></script>
+  <style>
+    /* Overrides para layout CV */
+    body { overflow: hidden; }
+    .cv-main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: .8rem;
+      padding: .8rem 1rem;
+      height: calc(100vh - 55px);
+    }
+    .cv-source-col, .cv-result-col {
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+      overflow: hidden;
+    }
+    .cv-bottom {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .8rem;
+    }
+    .video-box {
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    .video-box video, .video-box canvas, .video-box img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .no-signal {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--text-muted); gap: .5rem;
+    }
+    .fps-badge {
+      position: absolute; top:.5rem; left:.5rem;
+      background:rgba(0,0,0,.6); color:#0f0;
+      font-size:.75rem; padding:.2rem .5rem;
+      border-radius:4px; font-family:monospace;
+    }
+    @media(max-width:800px){
+      .cv-main { grid-template-columns: 1fr; grid-template-rows: auto; overflow-y: auto; }
+      body { overflow: auto; }
+      .cv-bottom { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">👁️ Visão Computacional</div>
+  <div class="navbar-links">
+    <a href="/">Início</a>
+    <a href="/arvr">AR/VR</a>
+    <a href="/cv" class="active">Visão Computacional</a>
+    <a href="/cv3d">CV → 3D</a>
+    <a href="/worldgen">AI World Gen</a>
+  </div>
+  <div id="wsStatus" class="status-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Desconectado</span>
+  </div>
+</nav>
+
+<!-- Layout principal -->
+<div class="cv-main">
+
+  <!-- ──────── Fonte (câmera/upload) ──────── -->
+  <div class="cv-source-col">
+    <div class="card" style="flex-shrink:0">
+      <div class="card-title">📷 Fonte de Entrada</div>
+      <div class="flex gap-1 mb-1">
+        <button class="btn btn-success btn-sm" id="btnStartCam" onclick="startCamera()">▶ Iniciar Câmera</button>
+        <button class="btn btn-danger btn-sm" id="btnStopCam" onclick="stopCamera()" disabled>⏹ Parar</button>
+        <label class="btn btn-outline btn-sm" style="cursor:pointer">
+          📁 Upload
+          <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="loadImageFile(event)">
+        </label>
+      </div>
+      <div class="flex gap-1" style="align-items:center">
+        <label class="form-label" style="margin:0;white-space:nowrap">FPS:</label>
+        <input type="range" id="fpsRange" min="1" max="15" value="5" style="flex:1">
+        <span id="fpsVal" style="font-size:.8rem;min-width:24px">5</span>
+      </div>
+    </div>
+
+    <div class="video-box" id="sourceBox">
+      <!-- Vídeo da câmera (captura) -->
+      <video id="webcamVideo" autoplay playsinline muted style="display:none"></video>
+      <!-- Canvas de captura (não visível) -->
+      <canvas id="captureCanvas" style="display:none"></canvas>
+      <!-- Imagem carregada -->
+      <img id="uploadedImg" style="display:none" alt="imagem carregada">
+      <!-- Placeholder -->
+      <div class="no-signal" id="noSignal">
+        <span style="font-size:2.5rem">📷</span>
+        <span>Inicie a câmera ou faça upload de uma imagem</span>
+      </div>
+      <div class="fps-badge" id="fpsBadge" style="display:none">0 fps</div>
+    </div>
+  </div>
+
+  <!-- ──────── Resultado ──────── -->
+  <div class="cv-result-col">
+    <div class="card" style="flex-shrink:0">
+      <div class="card-title">🔬 Pipeline de Processamento</div>
+      <div class="pipeline-buttons">
+        <button class="pipeline-btn active" data-pipeline="edges"     onclick="setPipeline(this)">Bordas (Canny)</button>
+        <button class="pipeline-btn"        data-pipeline="contours"  onclick="setPipeline(this)">Contornos</button>
+        <button class="pipeline-btn"        data-pipeline="faces"     onclick="setPipeline(this)">Detecção de Rostos</button>
+        <button class="pipeline-btn"        data-pipeline="color"     onclick="setPipeline(this)">Segmentação Cor</button>
+        <button class="pipeline-btn"        data-pipeline="blur"      onclick="setPipeline(this)">Desfoque Gaussiano</button>
+        <button class="pipeline-btn"        data-pipeline="threshold" onclick="setPipeline(this)">Limiarização</button>
+        <button class="pipeline-btn"        data-pipeline="hands"     onclick="setPipeline(this)">✋ Mãos</button>
+        <button class="pipeline-btn"        data-pipeline="pose"      onclick="setPipeline(this)">🦴 Pose/Articulações</button>
+      </div>
+    </div>
+
+    <div class="video-box" id="resultBox">
+      <img id="resultImg" style="display:none" alt="resultado CV">
+      <div class="no-signal" id="noResult">
+        <span style="font-size:2.5rem">🔬</span>
+        <span>Aguardando processamento…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ──────── Painel inferior ──────── -->
+  <div class="cv-bottom">
+
+    <!-- Detecções -->
+    <div class="card" style="overflow:hidden">
+      <div class="card-title">
+        📊 Detecções
+        <span id="detCount" style="margin-left:auto;background:var(--primary);border-radius:12px;padding:.1rem .6rem;font-size:.8rem">0</span>
+      </div>
+      <div id="detectionsList" class="detections-list" style="max-height:120px;overflow-y:auto">
+        <div style="color:var(--text-muted);font-size:.85rem;padding:.5rem">Nenhuma detecção ainda.</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">📜 Log</div>
+      <div class="log-panel" id="logPanel"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/js/cv.js"></script>
+</body>
+</html>

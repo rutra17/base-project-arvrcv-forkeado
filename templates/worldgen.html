@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI World Generator – Crie mundos 3D com IA</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/vendor/socket.io.min.js"></script>
+  <style>
+    body { overflow: hidden; }
+    .wg-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      height: calc(100vh - 55px);
+      overflow: hidden;
+    }
+
+    .wg-sidebar {
+      background: var(--darker);
+      border-right: 1px solid var(--border);
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: .8rem;
+    }
+
+    .wg-scene {
+      position: relative;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .wg-scene iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .wg-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      gap: 1rem;
+      text-align: center;
+      padding: 2rem;
+    }
+    .wg-placeholder .icon { font-size: 4rem; }
+    .wg-placeholder p { max-width: 400px; line-height: 1.6; }
+
+    .prompt-area {
+      width: 100%;
+      min-height: 100px;
+      max-height: 200px;
+      resize: vertical;
+      background: var(--darker);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: .9rem;
+      padding: .75rem;
+      line-height: 1.5;
+    }
+    .prompt-area:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(108, 99, 255, .15);
+    }
+    .prompt-area::placeholder { color: var(--text-muted); }
+
+    .model-select {
+      width: 100%;
+      padding: .5rem .75rem;
+      background: var(--darker);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: .85rem;
+    }
+    .model-select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .generating-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(26, 26, 46, .9);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 10;
+    }
+    .generating-overlay.active { display: flex; }
+
+    .spinner {
+      width: 50px; height: 50px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .scene-overlay-wg {
+      position: absolute;
+      top: .75rem;
+      right: .75rem;
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .scene-overlay-wg .badge {
+      background: rgba(0,0,0,.65);
+      color: #fff;
+      padding: .3rem .7rem;
+      border-radius: 20px;
+      font-size: .78rem;
+      backdrop-filter: blur(4px);
+      pointer-events: auto;
+    }
+
+    .tokens-info {
+      font-size: .75rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: .8rem;
+      padding: .3rem 0;
+    }
+    .tokens-info span { display: flex; align-items: center; gap: .2rem; }
+
+    .gallery-item {
+      background: rgba(255,255,255,.04);
+      border-radius: 8px;
+      padding: .6rem .8rem;
+      margin-bottom: .4rem;
+      cursor: pointer;
+      transition: background .2s;
+      font-size: .82rem;
+      color: var(--text-muted);
+    }
+    .gallery-item:hover { background: rgba(255,255,255,.08); color: var(--text); }
+    .gallery-item .prompt-preview {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .gallery-item .model-tag {
+      font-size: .7rem;
+      background: var(--primary);
+      color: #fff;
+      padding: .1rem .4rem;
+      border-radius: 8px;
+      margin-right: .4rem;
+    }
+
+    .example-prompts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .example-btn {
+      padding: .25rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .75rem;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .example-btn:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .code-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .3rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .75rem;
+      cursor: pointer;
+    }
+    .code-toggle:hover { background: rgba(255,255,255,.05); }
+
+    .code-preview {
+      display: none;
+      background: var(--darker);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .5rem;
+      max-height: 200px;
+      overflow: auto;
+      font-family: 'Consolas', monospace;
+      font-size: .72rem;
+      color: var(--accent);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .code-preview.visible { display: block; }
+
+    @media(max-width: 900px) {
+      .wg-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      body { overflow: auto; }
+      .wg-sidebar { max-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">🤖 AI World Gen</div>
+  <div class="navbar-links">
+    <a href="/">Início</a>
+    <a href="/arvr">AR/VR</a>
+    <a href="/cv">Visão Computacional</a>
+    <a href="/cv3d">CV → 3D</a>
+    <a href="/worldgen" class="active">AI World Gen</a>
+  </div>
+  <div id="wsStatus" class="status-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Desconectado</span>
+  </div>
+</nav>
+
+<div class="wg-layout">
+
+  <!-- Sidebar -->
+  <aside class="wg-sidebar">
+
+    <!-- Prompt -->
+    <div class="card">
+      <div class="card-title">✨ Descreva seu mundo</div>
+      <textarea class="prompt-area" id="promptInput" placeholder="Ex: Uma floresta encantada à noite com árvores luminosas, um lago espelhado e cogumelos gigantes brilhantes. Vaga-lumes flutuando no ar e uma lua cheia no céu estrelado..."
+                maxlength="2000"></textarea>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem">
+        <span style="font-size:.75rem;color:var(--text-muted)">Engine:</span>
+        <select class="model-select" id="engineSelect" style="flex:1">
+          <option value="scene" selected>🌍 Scene Engine (alta qualidade)</option>
+          <option value="threejs">🎮 Three.js (código gerado)</option>
+          <option value="aframe">🥽 A-Frame (compatível VR)</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-top:.4rem">
+        <span style="font-size:.75rem;color:var(--text-muted)">Modelo:</span>
+        <select class="model-select" id="modelSelect" style="flex:1">
+          <option value="gpt-4o-mini" selected>GPT-4o Mini (rápido)</option>
+          <option value="gpt-4.1-nano">GPT-4.1 Nano (ultra rápido)</option>
+          <option value="gpt-4.1-mini">GPT-4.1 Mini (equilibrado)</option>
+          <option value="gpt-4o">GPT-4o (mais detalhado)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block mt-1" id="btnGenerate" onclick="generateWorld()">
+        🚀 Gerar Mundo 3D
+      </button>
+      <div id="charCount" style="font-size:.7rem;color:var(--text-muted);text-align:right;margin-top:.2rem">0/2000</div>
+    </div>
+
+    <!-- Exemplos -->
+    <div class="card">
+      <div class="card-title" style="font-size:.85rem">💡 Exemplos</div>
+      <div class="example-prompts">
+        <button class="example-btn" onclick="useExample(this)">Floresta encantada</button>
+        <button class="example-btn" onclick="useExample(this)">Cidade futurista cyberpunk</button>
+        <button class="example-btn" onclick="useExample(this)">Fundo do oceano</button>
+        <button class="example-btn" onclick="useExample(this)">Sistema solar</button>
+        <button class="example-btn" onclick="useExample(this)">Castelo medieval</button>
+        <button class="example-btn" onclick="useExample(this)">Sala de estar moderna</button>
+        <button class="example-btn" onclick="useExample(this)">Parque de diversões</button>
+        <button class="example-btn" onclick="useExample(this)">Vulcão em erupção</button>
+      </div>
+    </div>
+
+    <!-- Tokens -->
+    <div id="tokensCard" class="card" style="display:none">
+      <div class="card-title" style="font-size:.85rem">📊 Uso da API</div>
+      <div class="tokens-info">
+        <span>📥 Prompt: <strong id="tokPrompt">0</strong></span>
+        <span>📤 Resposta: <strong id="tokCompletion">0</strong></span>
+        <span>Σ <strong id="tokTotal">0</strong></span>
+      </div>
+    </div>
+
+    <!-- Código gerado -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title" style="font-size:.85rem;margin-bottom:0">📝 Código</div>
+        <div class="flex gap-1">
+          <button class="code-toggle" onclick="toggleCode()">👁️ Ver HTML</button>
+          <button class="code-toggle" onclick="copyCode()">📋 Copiar</button>
+        </div>
+      </div>
+      <pre class="code-preview" id="codePreview"></pre>
+    </div>
+
+    <!-- Ações -->
+    <div class="card">
+      <div class="card-title" style="font-size:.85rem">🔧 Ações</div>
+      <div class="flex gap-1" style="flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" id="btnShare" onclick="shareScene()" disabled>📡 Compartilhar</button>
+        <button class="btn btn-outline btn-sm" id="btnFullscreen" onclick="goFullscreen()" disabled>⛶ Tela cheia</button>
+        <button class="btn btn-outline btn-sm" id="btnDownload" onclick="downloadScene()" disabled>💾 Baixar HTML</button>
+      </div>
+    </div>
+
+    <!-- Galeria -->
+    <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="card-title" style="font-size:.85rem;justify-content:space-between">
+        <span>🖼️ Galeria</span>
+        <span id="galleryCount" style="background:var(--primary);border-radius:12px;padding:.1rem .5rem;font-size:.75rem">0</span>
+      </div>
+      <div id="galleryList" style="overflow-y:auto;flex:1">
+        <div style="color:var(--text-muted);font-size:.8rem;text-align:center;padding:.5rem">Nenhuma cena gerada ainda.</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title" style="font-size:.85rem">📜 Log</div>
+      <div class="log-panel" id="logPanel" style="height:100px"></div>
+    </div>
+
+  </aside>
+
+  <!-- Cena 3D -->
+  <div class="wg-scene" id="sceneContainer">
+    <div class="wg-placeholder" id="scenePlaceholder">
+      <div class="icon">🌍</div>
+      <h2 style="color:var(--primary);font-size:1.5rem">AI World Generator</h2>
+      <p>Descreva o mundo que deseja criar e a IA vai gerar uma cena 3D interativa.<br>
+        <strong>Three.js</strong> = alta qualidade com post-processing · <strong>A-Frame</strong> = compatível com VR</p>
+      <p style="font-size:.8rem">Navegue com <strong>mouse (arrastar + scroll)</strong> ou <strong>WASD</strong> após gerar.</p>
+    </div>
+
+    <iframe id="sceneFrame" style="display:none"
+            sandbox="allow-scripts allow-same-origin"
+            title="Cena 3D gerada por IA"></iframe>
+
+    <div id="canvasContainer" style="display:none;width:100%;height:100%"></div>
+
+    <div class="generating-overlay" id="generatingOverlay">
+      <div class="spinner"></div>
+      <p style="color:var(--text)" id="genMessage">Gerando mundo 3D...</p>
+    </div>
+
+    <div class="scene-overlay-wg" id="sceneOverlay" style="display:none">
+      <span class="badge" id="promptBadge">-</span>
+      <span class="badge">WASD = andar | Q/E = descer/subir | Mouse = olhar | Shift = correr</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/js/worldgen.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import { WorldRenderer } from "/static/js/worldgen-renderer.js";
+  window.WorldRenderer = WorldRenderer;
+</script>
+</body>
+</html>

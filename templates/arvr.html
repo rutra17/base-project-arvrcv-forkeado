@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR/VR – Cena 3D Interativa</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- A-Frame WebXR -->
+  <script src="/static/vendor/aframe.min.js"></script>
+  <!-- Socket.IO -->
+  <script src="/static/vendor/socket.io.min.js"></script>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">🥽 AR/VR – Cena 3D</div>
+  <div class="navbar-links">
+    <a href="/">Início</a>
+    <a href="/arvr" class="active">AR/VR</a>
+    <a href="/cv">Visão Computacional</a>
+    <a href="/cv3d">CV → 3D</a>
+    <a href="/worldgen">AI World Gen</a>
+  </div>
+  <div id="wsStatus" class="status-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Desconectado</span>
+  </div>
+</nav>
+
+<!-- Layout principal -->
+<div class="arvr-layout">
+
+  <!-- ──────── Painel de controle ──────── -->
+  <aside class="control-panel">
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card-title">📡 Conexão WebSocket</div>
+      <div id="connInfo" style="font-size:.85rem;color:var(--text-muted)">Aguardando…</div>
+    </div>
+
+    <!-- Adicionar objetos -->
+    <div class="card">
+      <div class="card-title">➕ Adicionar Objeto</div>
+      <div class="form-group">
+        <label class="form-label">Cor do objeto</label>
+        <input type="color" id="objColor" value="#4CC3D9" class="form-control" style="height:38px;cursor:pointer">
+      </div>
+      <div class="shape-buttons">
+        <button class="btn btn-primary btn-sm" onclick="addObject('box')">📦 Cubo</button>
+        <button class="btn btn-primary btn-sm" onclick="addObject('sphere')">🔵 Esfera</button>
+        <button class="btn btn-primary btn-sm" onclick="addObject('cylinder')">🥁 Cilindro</button>
+        <button class="btn btn-primary btn-sm" onclick="addObject('cone')">🔺 Cone</button>
+        <button class="btn btn-primary btn-sm" onclick="addObject('torus')">🍩 Torus</button>
+        <button class="btn btn-primary btn-sm" onclick="addObject('dodecahedron')">💎 Dodecaedro</button>
+      </div>
+    </div>
+
+    <!-- Cor do céu -->
+    <div class="card">
+      <div class="card-title">🌅 Ambiente</div>
+      <div class="form-group">
+        <label class="form-label">Cor do céu</label>
+        <div class="flex gap-1">
+          <input type="color" id="skyColor" value="#87CEEB" class="form-control" style="height:38px;cursor:pointer;max-width:70px">
+          <button class="btn btn-outline" style="flex:1" onclick="changeSky()">Aplicar</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <button class="btn btn-outline btn-sm" onclick="setSkyPreset('#0a0a2e')">🌃 Noite</button>
+        <button class="btn btn-outline btn-sm" onclick="setSkyPreset('#ff7043')">🌅 Pôr do sol</button>
+        <button class="btn btn-outline btn-sm" onclick="setSkyPreset('#87CEEB')">☀️ Dia</button>
+        <button class="btn btn-outline btn-sm" onclick="setSkyPreset('#b0bec5')">🌫️ Nublado</button>
+      </div>
+    </div>
+
+    <!-- Objetos na cena -->
+    <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="card-title" style="justify-content:space-between">
+        <span>📋 Objetos na cena</span>
+        <span id="objCount" style="background:var(--primary);border-radius:12px;padding:.1rem .6rem;font-size:.8rem">0</span>
+      </div>
+      <div class="object-list" id="objectList">
+        <div style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:1rem">
+          Nenhum objeto ainda
+        </div>
+      </div>
+    </div>
+
+    <!-- Limpar cena -->
+    <button class="btn btn-danger btn-block" onclick="clearScene()">🗑️ Limpar Cena</button>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">📜 Log</div>
+      <div class="log-panel" id="logPanel"></div>
+    </div>
+
+  </aside>
+
+  <!-- ──────── Cena A-Frame ──────── -->
+  <div class="scene-wrapper">
+
+    <a-scene id="aScene" embedded
+             loading-screen="dotsColor: white; backgroundColor: #1a1a2e"
+             renderer="antialias: true; colorManagement: true">
+
+      <!-- Câmera -->
+      <a-entity id="rig" position="0 1.6 5">
+        <a-camera wasd-controls look-controls></a-camera>
+      </a-entity>
+
+      <!-- Iluminação -->
+      <a-light type="ambient" color="#445" intensity="0.5"></a-light>
+      <a-light type="directional" color="#fff" intensity="1.2" position="2 4 3"></a-light>
+
+      <!-- Chão -->
+      <a-plane id="ground"
+               rotation="-90 0 0"
+               width="30" height="30"
+               material="color:#1a1a2e;metalness:0.3;roughness:0.8"
+               shadow="receive:true">
+      </a-plane>
+
+      <!-- Grade do chão -->
+      <a-entity id="grid"></a-entity>
+
+      <!-- Contentor de objetos da cena -->
+      <a-entity id="sceneObjects"></a-entity>
+
+      <!-- Céu -->
+      <a-sky id="sky" color="#87CEEB"></a-sky>
+
+    </a-scene>
+
+    <!-- Overlay informativo -->
+    <div class="scene-overlay">
+      <span class="badge" id="objCountBadge">0 objetos</span>
+      <span class="badge">WASD + Mouse para navegar</span>
+      <span class="badge">VR disponível (clique 🥽)</span>
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/js/arvr.js"></script>
+</body>
+</html>
