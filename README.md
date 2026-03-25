@@ -1,4 +1,4 @@
-# server-project-arvrcv
+# base-project-arvrcv
 
 Servidor base para projetos das disciplinas de **Realidade Aumentada/Virtual** e **Visão Computacional**.
 
@@ -16,7 +16,7 @@ Servidor base para projetos das disciplinas de **Realidade Aumentada/Virtual** e
 ## Estrutura do projeto
 
 ```
-server-project-arvrcv/
+base-project-arvrcv/
 ├── server.py            # Servidor Flask + Socket.IO
 ├── requirements.txt     # Dependências Python
 ├── static/
@@ -37,24 +37,157 @@ server-project-arvrcv/
     └── worldgen.html    # Interface AI World Generator
 ```
 
-## Instalação e execução
+## Guia Rápido (2 minutos)
+
+Se você só quer rodar o projeto agora:
 
 ```bash
-# 1. Crie e ative um ambiente virtual (recomendado)
+# Linux/WSL/dev container (evita erro de libGL/libGLES)
+sudo apt-get install -y --no-install-recommends \
+  libgl1 libglib2.0-0 libgles2 libegl1
+
+# Ambiente Python
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Opcional: habilitar World Gen com OpenAI
+export OPENAI_API_KEY="sk-..."
+
+# Rodar servidor
+python server.py
+```
+
+Acesse **http://localhost:5000**.
+
+## GitHub Codespaces (comandos validados)
+
+Este foi o fluxo executado e validado no Codespace deste repositório:
+
+```bash
+# 1) Dependências nativas (corrige libGL.so.1 e libGLESv2.so.2)
+sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+sudo apt-get install -y --no-install-recommends libgles2 libegl1
+
+# 2) Testar import do OpenCV dentro do venv
+./venv/bin/python -c "import cv2; print('cv2 ok', cv2.__version__)"
+
+# 3) Subir servidor (teste curto)
+timeout 10s ./venv/bin/python server.py
+
+# 4) Rodar normalmente
+./venv/bin/python server.py
+```
+
+Se você preferir com o venv ativado:
+
+```bash
+source venv/bin/activate
+python server.py
+```
+
+Para habilitar o World Gen no Codespaces:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+./venv/bin/python server.py
+```
+
+## Guia detalhado de setup
+
+### 1) Pré-requisitos
+
+- Python 3.10+
+- `pip` e `venv`
+- Navegador moderno (Chrome/Edge/Firefox)
+- (Opcional) Chave da OpenAI para a tela de World Gen
+
+### 2) Dependências nativas (Linux/WSL/Dev Container)
+
+Para evitar erros de OpenCV/MediaPipe como `libGL.so.1` ou `libGLESv2.so.2` ausente:
+
+```bash
+sudo apt-get install -y --no-install-recommends \
+  libgl1 libglib2.0-0 libgles2 libegl1
+```
+
+> Em alguns ambientes, pode ser necessário rodar `sudo apt-get update` antes.
+
+### 3) Ambiente virtual e dependências Python
+
+```bash
+# Crie e ative um ambiente virtual (recomendado)
 python -m venv venv
 source venv/bin/activate   # Linux/macOS
 # venv\Scripts\activate    # Windows
 
-# 2. Instale as dependências
+# Instale as dependências
 pip install -r requirements.txt
+```
 
-# 3. Inicie o servidor
+### 4) Configure a OPENAI_API_KEY (para usar o World Gen)
+
+Sem essa variável, a tela `/worldgen` abre, mas não consegue gerar cenas via OpenAI.
+
+Linux/macOS (apenas terminal atual):
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+Linux/macOS (persistente):
+
+```bash
+echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Windows PowerShell (sessão atual):
+
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+```
+
+Validação rápida:
+
+```bash
+echo "$OPENAI_API_KEY"
+```
+
+Boas práticas:
+- Nunca commite a chave no Git.
+- Não coloque a chave direto no código-fonte.
+- Evite rodar `sudo python server.py` para não perder o ambiente virtual e variáveis da sessão.
+
+### 5) Execute o servidor
+
+```bash
+# Sem IA (World Gen indisponível)
 python server.py
-# ou, com a chave da OpenAI para AI World Gen:
-OPENAI_API_KEY="sk-..." python server.py
+
+# Com IA (World Gen habilitado)
+export OPENAI_API_KEY="sk-..."
+python server.py
 ```
 
 Acesse **http://localhost:5000** no navegador.
+
+Na primeira execução, os modelos do MediaPipe são baixados automaticamente para a pasta `models/`.
+
+## Solução de problemas rápida
+
+- `ImportError: libGL.so.1`: instale `libgl1` e `libglib2.0-0`
+- `OSError: libGLESv2.so.2`: instale `libgles2` e `libegl1`
+- Porta 5000 ocupada: rode `lsof -i :5000` para identificar o processo e liberar a porta
+- World Gen sem resposta: confirme se `OPENAI_API_KEY` está definida no terminal atual
+
+## Fluxo recomendado para aula/laboratório
+
+```bash
+source venv/bin/activate
+export OPENAI_API_KEY="sk-..."   # opcional
+python server.py
+```
 
 ## Interfaces
 
