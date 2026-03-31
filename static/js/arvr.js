@@ -254,3 +254,42 @@ function toggleAnimation(id) {
 
 /* ── Inicialização ── */
 document.addEventListener("DOMContentLoaded", initSocket);
+
+
+
+// Escuta os dados vindos do servidor de Visão Computacional
+socket.on("faces_detected", (data) => {
+    data.faces.forEach(face => {
+        let avatar = document.getElementById(face.id);
+        
+        // Se o avatar não existe na cena, cria um novo
+        if (!avatar) {
+            avatar = document.createElement("a-sphere"); // Ou a-box
+            avatar.setAttribute("id", face.id);
+            avatar.setAttribute("radius", "0.4");
+            avatar.setAttribute("color", "#ff0000");
+            
+            // Desafio Master: Nome flutuando
+            let text = document.createElement("a-text");
+            text.setAttribute("value", face.name);
+            text.setAttribute("align", "center");
+            text.setAttribute("position", "0 0.8 0");
+            text.setAttribute("scale", "1.5 1.5 1.5");
+            avatar.appendChild(text);
+            
+            document.getElementById("sceneObjects").appendChild(avatar);
+        }
+
+        // MAPEAMENTO ESPACIAL (O ponto mais importante da atividade)
+        const frameW = 640; // Largura do vídeo no cv.js
+        const frameH = 480; 
+        
+        // Converte pixels (0 a 640) para metros no VR (-5 a 5)
+        let posX = (face.x / frameW) * 10 - 5;
+        let posY = ((frameH - face.y) / frameH) * 4; 
+        // Profundidade Z baseada no tamanho do rosto (w)
+        let posZ = - (150 / face.w) * 2; 
+
+        avatar.setAttribute("position", `${posX} ${posY} ${posZ}`);
+    });
+});
