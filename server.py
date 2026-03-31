@@ -671,13 +671,7 @@ def on_leave_cv():
 @socketio.on("cv_frame")
 def on_cv_frame(data):
     """
-    Recebe um frame (imagem base64) do cliente, aplica o pipeline de CV e
-    devolve os resultados ao mesmo cliente.
-
-    data = {
-        "image": "<base64 string>",   # frame capturado
-        "pipeline": "edges"|"contours"|"faces"|"color"|"blur"|"threshold"
-    }
+    Recebe um frame do cliente CV, processa e envia as coordenadas para o VR.
     """
     pipeline = data.get("pipeline", "edges")
     image_b64 = data.get("image", "")
@@ -693,9 +687,30 @@ def on_cv_frame(data):
             emit("cv_result", {"error": "Não foi possível decodificar a imagem."})
             return
 
+        # Aplica o pipeline padrão do professor
         result_frame, detections = _apply_pipeline(frame, pipeline)
 
-        # Codifica resultado de volta para base64
+        # --- LÓGICA DA ATIVIDADE: Mapeamento para o VR ---
+        if pipeline == "faces":
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = face_cascade.detectMultiScale(gray, 1.1, 5)
+
+            face_data = []
+            for i, (x, y, w, h) in enumerate(faces):
+                face_data.append({
+                    "id": f"user_{i}",
+                    "x": int(x),
+                    "y": int(y),
+                    "w": int(w),
+                    "h": int(h),
+                    "name": f"Spider-User {i+1}" # Personalização para o "Peter Parker" da Brose
+                })
+
+            # TRANSMISSÃO: Envia os dados para quem estiver na página /arvr
+            socketio.emit("faces_detected", {"faces": face_data}, to="arvr")
+
+        # Codifica resultado de volta para base64 para exibir no /cv
         _, buffer = cv2.imencode(".jpg", result_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
         result_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
