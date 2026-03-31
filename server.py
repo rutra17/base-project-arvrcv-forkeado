@@ -704,7 +704,7 @@ def on_cv_frame(data):
                     "y": int(y),
                     "w": int(w),
                     "h": int(h),
-                    "name": f"Spider-User {i+1}" # Personalização para o "Peter Parker" da Brose
+                    "name": f"Random-User {i+1}" 
                 })
 
             # TRANSMISSÃO: Envia os dados para quem estiver na página /arvr
